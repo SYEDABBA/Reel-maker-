@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 YUGRAAL Zero-Budget Gemstone Video Generator Engine
-Fixed Gemini Model Name Resolution & Fallback Logic
+Migrated to New Official Google GenAI SDK (google-genai)
 """
 
 import os
@@ -11,7 +11,7 @@ import random
 import asyncio
 import textwrap
 from PIL import Image, ImageDraw
-import google.generativeai as genai
+from google import genai
 import edge_tts
 from moviepy import ImageClip, AudioFileClip
 
@@ -20,7 +20,7 @@ if not GEMINI_API_KEY:
     print("ERROR: GEMINI_API_KEY environment variable missing.", file=sys.stderr)
     sys.exit(1)
 
-genai.configure(api_key=GEMINI_API_KEY)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 GEMSTONES = [
     "Yellow Sapphire (Pukhraj)", 
@@ -33,7 +33,7 @@ GEMSTONES = [
 ]
 
 SCRIPT_PROMPT_TEMPLATE = """
-Tu ek master Hindi storyteller aur gemstone expert hai. Niche diye gaye gemstone par ek dramatic short voiceover script likh.
+Tu ek master Hindi storyteller aur gemstone expert hai. Niche दिए गए gemstone par ek dramatic short voiceover script likh.
 
 Gemstone: {gemstone}
 
@@ -51,15 +51,16 @@ Requirements:
 def generate_gemstone_script(gemstone_name: str) -> dict:
     print(f"📖 Generating Hindi story for {gemstone_name} via Gemini API...")
     
-    # Try preferred model candidates with fallback
-    candidates = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"]
+    candidates = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
     last_err = None
     
     for model_name in candidates:
         try:
             print(f"🔄 Trying model: {model_name}...")
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name))
+            response = client.models.generate_content(
+                model=model_name,
+                contents=SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name)
+            )
             if response and response.text:
                 cleaned = response.text.replace("```json", "").replace("```", "").strip()
                 print(f"✨ Success with model: {model_name}")
@@ -127,3 +128,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
