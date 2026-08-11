@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 YUGRAAL Zero-Budget Gemstone Video Generator Engine
-Auto-detects available active Gemini models from API key
+Fixed Model Name String Mapping for google-genai SDK
 """
 
 import os
@@ -48,40 +48,33 @@ Requirements:
 }}
 """
 
-def get_active_model_name() -> str:
-    print("🔍 Fetching active models from Gemini API...")
-    try:
-        models = list(client.models.list())
-        for m in models:
-            m_name = m.name if hasattr(m, 'name') else str(m)
-            # Find any valid flash/pro generateContent supported model
-            if "flash" in m_name.lower() or "pro" in m_name.lower():
-                clean_name = m_name.replace("models/", "")
-                print(f"🎯 Selected active model: {clean_name}")
-                return clean_name
-    except Exception as e:
-        print(f"⚠️ Could not auto-fetch models: {e}")
-    
-    # Fallback to standard alias
-    return "gemini-2.5-flash"
-
 def generate_gemstone_script(gemstone_name: str) -> dict:
     print(f"📖 Generating Hindi story for {gemstone_name} via Gemini API...")
     
-    target_model = get_active_model_name()
+    # Standard models to test
+    candidates = [
+        "gemini-2.5-flash",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-pro-latest"
+    ]
     
-    try:
-        response = client.models.generate_content(
-            model=target_model,
-            contents=SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name)
-        )
-        if response and response.text:
-            cleaned = response.text.replace("```json", "").replace("```", "").strip()
-            print(f"✨ Successfully generated content with: {target_model}")
-            return json.loads(cleaned)
-    except Exception as e:
-        print(f"❌ Generation failed on {target_model}: {e}")
-        raise e
+    last_err = None
+    for model_name in candidates:
+        try:
+            print(f"🔄 Trying model: {model_name}...")
+            response = client.models.generate_content(
+                model=model_name,
+                contents=SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name)
+            )
+            if response and response.text:
+                cleaned = response.text.replace("```json", "").replace("```", "").strip()
+                print(f"✨ Success with model: {model_name}")
+                return json.loads(cleaned)
+        except Exception as e:
+            print(f"⚠️ Model {model_name} failed: {e}")
+            last_err = e
+
+    raise RuntimeError(f"All model attempts failed. Last error: {last_err}")
 
 async def text_to_speech_hindi(text: str, output_audio_path: str):
     print("🎙️ Generating AI Hindi Voiceover (Edge-TTS hi-IN-MadhurNeural)...")
@@ -140,3 +133,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
