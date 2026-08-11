@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 YUGRAAL Gemstone Video Generator Engine
-Direct REST API Implementation (Zero SDK Bugs)
+Direct v1 REST API Implementation
 """
 
 import os
@@ -52,13 +52,16 @@ def generate_gemstone_script(gemstone_name: str) -> dict:
     
     prompt_text = SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name)
     
-    # Try models directly via HTTP REST API
-    models = ["gemini-2.0-flash", "gemini-1.5-flash"]
+    # Try different active API endpoints and models
+    endpoints = [
+        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
+        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    ]
+    
     last_err = None
 
-    for model_name in models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
-        
+    for url in endpoints:
         payload = {
             "contents": [
                 {
@@ -71,18 +74,18 @@ def generate_gemstone_script(gemstone_name: str) -> dict:
         req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
         
         try:
-            print(f"🔄 Requesting via model: {model_name}...")
+            print(f"🔄 Requesting API Endpoint...")
             with urllib.request.urlopen(req) as response:
                 res_data = json.loads(response.read().decode('utf-8'))
                 raw_text = res_data['candidates'][0]['content']['parts'][0]['text']
                 cleaned = raw_text.replace("```json", "").replace("```", "").strip()
-                print(f"✨ Success with model: {model_name}")
+                print("✨ Success! Script generated.")
                 return json.loads(cleaned)
         except Exception as e:
-            print(f"⚠️ Model {model_name} failed: {e}")
+            print(f"⚠️ Endpoint failed: {e}")
             last_err = e
 
-    raise RuntimeError(f"All API model attempts failed. Error: {last_err}")
+    raise RuntimeError(f"All API attempts failed. Error: {last_err}")
 
 async def text_to_speech_hindi(text: str, output_audio_path: str):
     print("🎙️ Generating AI Hindi Voiceover (Edge-TTS hi-IN-MadhurNeural)...")
