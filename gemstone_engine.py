@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 YUGRAAL Zero-Budget Gemstone Video Generator Engine
-Fixed Model Name String Mapping for google-genai SDK
+Powered by Official google-genai SDK
 """
 
 import os
@@ -20,6 +20,7 @@ if not GEMINI_API_KEY:
     print("ERROR: GEMINI_API_KEY environment variable missing.", file=sys.stderr)
     sys.exit(1)
 
+# Initialize Google GenAI client
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 GEMSTONES = [
@@ -51,14 +52,10 @@ Requirements:
 def generate_gemstone_script(gemstone_name: str) -> dict:
     print(f"📖 Generating Hindi story for {gemstone_name} via Gemini API...")
     
-    # Standard models to test
-    candidates = [
-        "gemini-2.5-flash",
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-pro-latest"
-    ]
-    
+    # Official supported production models in google-genai SDK
+    candidates = ["gemini-2.5-flash", "gemini-2.5-pro"]
     last_err = None
+    
     for model_name in candidates:
         try:
             print(f"🔄 Trying model: {model_name}...")
@@ -133,4 +130,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
