@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 YUGRAAL Zero-Budget Gemstone Video Generator Engine
-Migrated to New Official Google GenAI SDK (google-genai)
+Fixed API Version & Model Resolution
 """
 
 import os
@@ -20,6 +20,7 @@ if not GEMINI_API_KEY:
     print("ERROR: GEMINI_API_KEY environment variable missing.", file=sys.stderr)
     sys.exit(1)
 
+# Initialize client using new SDK
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 GEMSTONES = [
@@ -33,7 +34,7 @@ GEMSTONES = [
 ]
 
 SCRIPT_PROMPT_TEMPLATE = """
-Tu ek master Hindi storyteller aur gemstone expert hai. Niche दिए गए gemstone par ek dramatic short voiceover script likh.
+Tu ek master Hindi storyteller aur gemstone expert hai. Niche diye gaye gemstone par ek dramatic short voiceover script likh.
 
 Gemstone: {gemstone}
 
@@ -51,7 +52,8 @@ Requirements:
 def generate_gemstone_script(gemstone_name: str) -> dict:
     print(f"📖 Generating Hindi story for {gemstone_name} via Gemini API...")
     
-    candidates = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    # Models to try in order
+    candidates = ["gemini-2.5-flash", "gemini-2.0-flash"]
     last_err = None
     
     for model_name in candidates:
@@ -128,4 +130,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
