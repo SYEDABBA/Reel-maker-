@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 YUGRAAL Gemstone Video Generator Engine
-Zero-External-Dependency Direct REST Implementation
+Powered by Groq API
 """
 
 import os
@@ -10,16 +10,18 @@ import json
 import random
 import asyncio
 import textwrap
-import urllib.request
-import urllib.error
 from PIL import Image, ImageDraw
+from groq import Groq
 import edge_tts
 from moviepy import ImageClip, AudioFileClip
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    print("ERROR: GEMINI_API_KEY environment variable missing.", file=sys.stderr)
+# Accept either GROQ_API_KEY or GEMINI_API_KEY from environment
+GROQ_API_KEY = os.getenv("GROQ_API_KEY") or os.getenv("GEMINI_API_KEY")
+if not GROQ_API_KEY:
+    print("❌ ERROR: API Key missing! Please set GROQ_API_KEY or GEMINI_API_KEY in GitHub Repo Secrets.", file=sys.stderr)
     sys.exit(1)
+
+client = Groq(api_key=GROQ_API_KEY)
 
 GEMSTONES = [
     "Yellow Sapphire (Pukhraj)", 
@@ -39,7 +41,7 @@ Gemstone: {gemstone}
 Requirements:
 1. Hindi me kahani ya uski shakti/history explain karo (Anime/Manga dramatic commentary style me).
 2. Pure Hindi text likho jo bolne me shaandar aur energetic lage (60-80 words max).
-3. Output strictly valid JSON format me do (without markdown formatting):
+3. Output strictly valid JSON format me do:
 {{
   "gemstone": "{gemstone}",
   "title": "Dramatic Title in Hindi",
@@ -48,47 +50,27 @@ Requirements:
 """
 
 def generate_gemstone_script(gemstone_name: str) -> dict:
-    print(f"📖 Generating Hindi story for {gemstone_name} via Direct REST API...")
+    print(f"⚡ Generating Hindi story for {gemstone_name} via Groq API...")
     
-    prompt_text = SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name)
-    
-    # 100% Valid Google REST Endpoints for Gemini API
-    endpoints = [
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
-    ]
-    
-    last_err = None
-
-    for url in endpoints:
-        payload = {
-            "contents": [
+    try:
+        response = client.chat.completions.create(
+            messages=[
                 {
-                    "parts": [{"text": prompt_text}]
+                    "role": "user",
+                    "content": SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name),
                 }
-            ]
-        }
+            ],
+            model="llama-3.3-70b-versatile",
+            response_format={"type": "json_object"}
+        )
         
-        data = json.dumps(payload).encode('utf-8')
-        req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+        raw_text = response.choices[0].message.content
+        print("✨ Success! Script generated via Groq.")
+        return json.loads(raw_text)
         
-        try:
-            model_name = url.split("/models/")[1].split(":")[0]
-            print(f"🔄 Requesting model: {model_name}...")
-            with urllib.request.urlopen(req) as response:
-                res_data = json.loads(response.read().decode('utf-8'))
-                raw_text = res_data['candidates'][0]['content']['parts'][0]['text']
-                
-                # Cleanup potential code block wrappers
-                cleaned = raw_text.replace("```json", "").replace("```", "").strip()
-                print(f"✨ Success with {model_name}! Script generated.")
-                return json.loads(cleaned)
-        except Exception as e:
-            print(f"⚠️ Attempt failed on {url.split('/models/')[1].split(':')[0]}: {e}")
-            last_err = e
-
-    raise RuntimeError(f"All API attempts failed. Error: {last_err}")
+    except Exception as e:
+        print(f"❌ Groq Generation failed: {e}")
+        raise e
 
 async def text_to_speech_hindi(text: str, output_audio_path: str):
     print("🎙️ Generating AI Hindi Voiceover (Edge-TTS hi-IN-MadhurNeural)...")
