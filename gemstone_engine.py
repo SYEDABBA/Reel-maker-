@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 YUGRAAL Gemstone Video Generator Engine
-Direct v1 REST API Implementation
+Official Google GenAI SDK Implementation (Robust & Auto-Fallback)
 """
 
 import os
@@ -10,16 +10,18 @@ import json
 import random
 import asyncio
 import textwrap
-import urllib.request
-import urllib.parse
+import google.generativeai as genai
 from PIL import Image, ImageDraw
 import edge_tts
 from moviepy import ImageClip, AudioFileClip
 
+# API Key Validation
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     print("ERROR: GEMINI_API_KEY environment variable missing.", file=sys.stderr)
     sys.exit(1)
+
+genai.configure(api_key=GEMINI_API_KEY)
 
 GEMSTONES = [
     "Yellow Sapphire (Pukhraj)", 
@@ -48,44 +50,29 @@ Requirements:
 """
 
 def generate_gemstone_script(gemstone_name: str) -> dict:
-    print(f"📖 Generating Hindi story for {gemstone_name} via Direct REST API...")
+    print(f"📖 Generating Hindi story for {gemstone_name} via Official SDK...")
     
     prompt_text = SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name)
     
-    # Try different active API endpoints and models
-    endpoints = [
-        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-    ]
+    # List of models to try in order
+    model_candidates = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"]
     
     last_err = None
-
-    for url in endpoints:
-        payload = {
-            "contents": [
-                {
-                    "parts": [{"text": prompt_text}]
-                }
-            ]
-        }
-        
-        data = json.dumps(payload).encode('utf-8')
-        req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
-        
+    for model_name in model_candidates:
         try:
-            print(f"🔄 Requesting API Endpoint...")
-            with urllib.request.urlopen(req) as response:
-                res_data = json.loads(response.read().decode('utf-8'))
-                raw_text = res_data['candidates'][0]['content']['parts'][0]['text']
-                cleaned = raw_text.replace("```json", "").replace("```", "").strip()
-                print("✨ Success! Script generated.")
-                return json.loads(cleaned)
+            print(f"🔄 Trying model: {model_name}...")
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt_text)
+            
+            raw_text = response.text.strip()
+            cleaned = raw_text.replace("```json", "").replace("```", "").strip()
+            print(f"✨ Success using model: {model_name}!")
+            return json.loads(cleaned)
         except Exception as e:
-            print(f"⚠️ Endpoint failed: {e}")
+            print(f"⚠️ Model {model_name} failed: {e}")
             last_err = e
 
-    raise RuntimeError(f"All API attempts failed. Error: {last_err}")
+    raise RuntimeError(f"All model attempts failed. Last Error: {last_err}")
 
 async def text_to_speech_hindi(text: str, output_audio_path: str):
     print("🎙️ Generating AI Hindi Voiceover (Edge-TTS hi-IN-MadhurNeural)...")
