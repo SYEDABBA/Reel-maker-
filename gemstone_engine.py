@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 YUGRAAL Gemstone Video Generator Engine
-Official Google GenAI SDK Implementation (Robust & Auto-Fallback)
+Zero-External-Dependency Direct REST Implementation
 """
 
 import os
@@ -10,18 +10,16 @@ import json
 import random
 import asyncio
 import textwrap
-import google.generativeai as genai
+import urllib.request
+import urllib.error
 from PIL import Image, ImageDraw
 import edge_tts
 from moviepy import ImageClip, AudioFileClip
 
-# API Key Validation
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     print("ERROR: GEMINI_API_KEY environment variable missing.", file=sys.stderr)
     sys.exit(1)
-
-genai.configure(api_key=GEMINI_API_KEY)
 
 GEMSTONES = [
     "Yellow Sapphire (Pukhraj)", 
@@ -41,7 +39,7 @@ Gemstone: {gemstone}
 Requirements:
 1. Hindi me kahani ya uski shakti/history explain karo (Anime/Manga dramatic commentary style me).
 2. Pure Hindi text likho jo bolne me shaandar aur energetic lage (60-80 words max).
-3. Output strictly valid JSON format me do:
+3. Output strictly valid JSON format me do (without markdown formatting):
 {{
   "gemstone": "{gemstone}",
   "title": "Dramatic Title in Hindi",
@@ -50,29 +48,47 @@ Requirements:
 """
 
 def generate_gemstone_script(gemstone_name: str) -> dict:
-    print(f"📖 Generating Hindi story for {gemstone_name} via Official SDK...")
+    print(f"📖 Generating Hindi story for {gemstone_name} via Direct REST API...")
     
     prompt_text = SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name)
     
-    # List of models to try in order
-    model_candidates = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"]
+    # 100% Valid Google REST Endpoints for Gemini API
+    endpoints = [
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
+    ]
     
     last_err = None
-    for model_name in model_candidates:
+
+    for url in endpoints:
+        payload = {
+            "contents": [
+                {
+                    "parts": [{"text": prompt_text}]
+                }
+            ]
+        }
+        
+        data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+        
         try:
-            print(f"🔄 Trying model: {model_name}...")
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt_text)
-            
-            raw_text = response.text.strip()
-            cleaned = raw_text.replace("```json", "").replace("```", "").strip()
-            print(f"✨ Success using model: {model_name}!")
-            return json.loads(cleaned)
+            model_name = url.split("/models/")[1].split(":")[0]
+            print(f"🔄 Requesting model: {model_name}...")
+            with urllib.request.urlopen(req) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                raw_text = res_data['candidates'][0]['content']['parts'][0]['text']
+                
+                # Cleanup potential code block wrappers
+                cleaned = raw_text.replace("```json", "").replace("```", "").strip()
+                print(f"✨ Success with {model_name}! Script generated.")
+                return json.loads(cleaned)
         except Exception as e:
-            print(f"⚠️ Model {model_name} failed: {e}")
+            print(f"⚠️ Attempt failed on {url.split('/models/')[1].split(':')[0]}: {e}")
             last_err = e
 
-    raise RuntimeError(f"All model attempts failed. Last Error: {last_err}")
+    raise RuntimeError(f"All API attempts failed. Error: {last_err}")
 
 async def text_to_speech_hindi(text: str, output_audio_path: str):
     print("🎙️ Generating AI Hindi Voiceover (Edge-TTS hi-IN-MadhurNeural)...")
@@ -131,3 +147,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
