@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 YUGRAAL Zero-Budget Gemstone Video Generator Engine
-100% Free Stack: Gemini API + Edge-TTS + MoviePy + GitHub Actions
+Updated for MoviePy v2.0+ & Modern Google GenAI SDK
 """
 
 import os
@@ -10,10 +10,10 @@ import json
 import random
 import asyncio
 import textwrap
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 import google.generativeai as genai
 import edge_tts
-from moviepy.editor import ImageClip, AudioFileClip, TextClip, CompositeVideoClip
+from moviepy import ImageClip, AudioFileClip
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
@@ -66,7 +66,7 @@ def create_card_image(title: str, gemstone: str, output_img_path: str):
     img = Image.new('RGB', (720, 1280), color=(10, 12, 24))
     draw = ImageDraw.Draw(img)
     
-    # Futuristic Frame
+    # Outer Glow Frame
     draw.rectangle([20, 20, 700, 1260], outline=(0, 240, 255), width=4)
     
     # Headers
@@ -87,16 +87,14 @@ def build_video(image_path: str, audio_path: str, output_video_path: str):
     audio = AudioFileClip(audio_path)
     duration = audio.duration
     
-    clip = ImageClip(image_path).set_duration(duration)
-    video = clip.set_audio(audio)
+    clip = ImageClip(image_path).with_duration(duration)
+    video = clip.with_audio(audio)
     
     video.write_videofile(
         output_video_path,
         fps=24,
         codec="libx264",
-        audio_codec="aac",
-        verbose=False,
-        logger=None
+        audio_codec="aac"
     )
     print(f"✅ Rendered Video Saved at: {output_video_path}")
 
