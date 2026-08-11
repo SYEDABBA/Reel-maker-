@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 YUGRAAL Zero-Budget Gemstone Video Generator Engine
-Updated for MoviePy v2.0+ & Modern Google GenAI SDK
+Fixed Gemini Model Name Resolution & Fallback Logic
 """
 
 import os
@@ -50,11 +50,25 @@ Requirements:
 
 def generate_gemstone_script(gemstone_name: str) -> dict:
     print(f"📖 Generating Hindi story for {gemstone_name} via Gemini API...")
-    model = genai.GenerativeModel("models/gemini-1.5-flash")
-    response = model.generate_content(SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name))
     
-    cleaned = response.text.replace("```json", "").replace("```", "").strip()
-    return json.loads(cleaned)
+    # Try preferred model candidates with fallback
+    candidates = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"]
+    last_err = None
+    
+    for model_name in candidates:
+        try:
+            print(f"🔄 Trying model: {model_name}...")
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name))
+            if response and response.text:
+                cleaned = response.text.replace("```json", "").replace("```", "").strip()
+                print(f"✨ Success with model: {model_name}")
+                return json.loads(cleaned)
+        except Exception as e:
+            print(f"⚠️ Model {model_name} failed: {e}")
+            last_err = e
+            
+    raise RuntimeError(f"All model attempts failed. Last error: {last_err}")
 
 async def text_to_speech_hindi(text: str, output_audio_path: str):
     print("🎙️ Generating AI Hindi Voiceover (Edge-TTS hi-IN-MadhurNeural)...")
