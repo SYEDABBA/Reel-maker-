@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 YUGRAAL Zero-Budget Gemstone Video Generator Engine
-Fixed API Version & Model Resolution
+Auto-detects available active Gemini models from API key
 """
 
 import os
@@ -20,7 +20,6 @@ if not GEMINI_API_KEY:
     print("ERROR: GEMINI_API_KEY environment variable missing.", file=sys.stderr)
     sys.exit(1)
 
-# Initialize client using new SDK
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 GEMSTONES = [
@@ -49,29 +48,40 @@ Requirements:
 }}
 """
 
+def get_active_model_name() -> str:
+    print("🔍 Fetching active models from Gemini API...")
+    try:
+        models = list(client.models.list())
+        for m in models:
+            m_name = m.name if hasattr(m, 'name') else str(m)
+            # Find any valid flash/pro generateContent supported model
+            if "flash" in m_name.lower() or "pro" in m_name.lower():
+                clean_name = m_name.replace("models/", "")
+                print(f"🎯 Selected active model: {clean_name}")
+                return clean_name
+    except Exception as e:
+        print(f"⚠️ Could not auto-fetch models: {e}")
+    
+    # Fallback to standard alias
+    return "gemini-2.5-flash"
+
 def generate_gemstone_script(gemstone_name: str) -> dict:
     print(f"📖 Generating Hindi story for {gemstone_name} via Gemini API...")
     
-    # Models to try in order
-    candidates = ["gemini-2.5-flash", "gemini-2.0-flash"]
-    last_err = None
+    target_model = get_active_model_name()
     
-    for model_name in candidates:
-        try:
-            print(f"🔄 Trying model: {model_name}...")
-            response = client.models.generate_content(
-                model=model_name,
-                contents=SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name)
-            )
-            if response and response.text:
-                cleaned = response.text.replace("```json", "").replace("```", "").strip()
-                print(f"✨ Success with model: {model_name}")
-                return json.loads(cleaned)
-        except Exception as e:
-            print(f"⚠️ Model {model_name} failed: {e}")
-            last_err = e
-            
-    raise RuntimeError(f"All model attempts failed. Last error: {last_err}")
+    try:
+        response = client.models.generate_content(
+            model=target_model,
+            contents=SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name)
+        )
+        if response and response.text:
+            cleaned = response.text.replace("```json", "").replace("```", "").strip()
+            print(f"✨ Successfully generated content with: {target_model}")
+            return json.loads(cleaned)
+    except Exception as e:
+        print(f"❌ Generation failed on {target_model}: {e}")
+        raise e
 
 async def text_to_speech_hindi(text: str, output_audio_path: str):
     print("🎙️ Generating AI Hindi Voiceover (Edge-TTS hi-IN-MadhurNeural)...")
