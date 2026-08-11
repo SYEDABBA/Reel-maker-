@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-YUGRAAL Zero-Budget Gemstone Video Generator Engine
-Powered by Official google-genai SDK
+YUGRAAL Gemstone Video Generator Engine
+Direct REST API Implementation (Zero SDK Bugs)
 """
 
 import os
@@ -10,8 +10,9 @@ import json
 import random
 import asyncio
 import textwrap
+import urllib.request
+import urllib.parse
 from PIL import Image, ImageDraw
-from google import genai
 import edge_tts
 from moviepy import ImageClip, AudioFileClip
 
@@ -19,9 +20,6 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     print("ERROR: GEMINI_API_KEY environment variable missing.", file=sys.stderr)
     sys.exit(1)
-
-# Initialize Google GenAI client
-client = genai.Client(api_key=GEMINI_API_KEY)
 
 GEMSTONES = [
     "Yellow Sapphire (Pukhraj)", 
@@ -50,28 +48,41 @@ Requirements:
 """
 
 def generate_gemstone_script(gemstone_name: str) -> dict:
-    print(f"📖 Generating Hindi story for {gemstone_name} via Gemini API...")
+    print(f"📖 Generating Hindi story for {gemstone_name} via Direct REST API...")
     
-    # Official supported production models in google-genai SDK
-    candidates = ["gemini-2.5-flash", "gemini-2.5-pro"]
+    prompt_text = SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name)
+    
+    # Try models directly via HTTP REST API
+    models = ["gemini-2.0-flash", "gemini-1.5-flash"]
     last_err = None
-    
-    for model_name in candidates:
+
+    for model_name in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+        
+        payload = {
+            "contents": [
+                {
+                    "parts": [{"text": prompt_text}]
+                }
+            ]
+        }
+        
+        data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+        
         try:
-            print(f"🔄 Trying model: {model_name}...")
-            response = client.models.generate_content(
-                model=model_name,
-                contents=SCRIPT_PROMPT_TEMPLATE.format(gemstone=gemstone_name)
-            )
-            if response and response.text:
-                cleaned = response.text.replace("```json", "").replace("```", "").strip()
+            print(f"🔄 Requesting via model: {model_name}...")
+            with urllib.request.urlopen(req) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                raw_text = res_data['candidates'][0]['content']['parts'][0]['text']
+                cleaned = raw_text.replace("```json", "").replace("```", "").strip()
                 print(f"✨ Success with model: {model_name}")
                 return json.loads(cleaned)
         except Exception as e:
             print(f"⚠️ Model {model_name} failed: {e}")
             last_err = e
 
-    raise RuntimeError(f"All model attempts failed. Last error: {last_err}")
+    raise RuntimeError(f"All API model attempts failed. Error: {last_err}")
 
 async def text_to_speech_hindi(text: str, output_audio_path: str):
     print("🎙️ Generating AI Hindi Voiceover (Edge-TTS hi-IN-MadhurNeural)...")
