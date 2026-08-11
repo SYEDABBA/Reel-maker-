@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: '0 12 * * *'  # Har roz dopahar 12 baje auto-run hoga
 
+# GitHub Bot ko repo me Push karne ki permission
+permissions:
+  contents: write
+
 jobs:
   build-and-render:
     runs-on: ubuntu-latest
